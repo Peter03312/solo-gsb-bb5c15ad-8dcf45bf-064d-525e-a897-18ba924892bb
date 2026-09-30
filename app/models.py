@@ -29,3 +29,23 @@ class BatchCreate(BaseModel):
 
 class SourcesUpdate(BaseModel):
     sources: List[SourceRef]
+
+
+class ReplacementSpec(BaseModel):
+    """单个可替换的直接来源位置：seq 为现有直接来源序号，candidates 为候选来源。"""
+
+    seq: int = Field(ge=0)
+    candidates: List[SourceRef]
+
+
+class ReplacePreviewRequest(BaseModel):
+    """替换预演请求：禁止出现的过敏原 + 各位置候选来源（未列出的位置保持不变）。"""
+
+    forbidden_allergens: List[str] = []
+    replacements: List[ReplacementSpec] = []
+
+
+class ReplaceAdoptRequest(BaseModel):
+    """采纳请求：必须携带预演返回的 preview_token（采纳依据）。"""
+
+    preview_token: str = Field(min_length=1)

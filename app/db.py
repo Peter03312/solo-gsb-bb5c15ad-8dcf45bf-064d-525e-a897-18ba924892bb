@@ -56,6 +56,14 @@ CREATE TABLE IF NOT EXISTS finalizations (
     paths           TEXT NOT NULL,          -- JSON 对象 {过敏原: [路径]}
     finalized_at    TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS replace_previews (
+    token       TEXT PRIMARY KEY,
+    batch_id    TEXT NOT NULL,
+    basis       TEXT NOT NULL,              -- JSON：采纳依据（批次状态与证据指纹）
+    plan        TEXT NOT NULL,              -- JSON：预演选中的可行方案
+    created_at  TEXT NOT NULL
+);
 """
 
 

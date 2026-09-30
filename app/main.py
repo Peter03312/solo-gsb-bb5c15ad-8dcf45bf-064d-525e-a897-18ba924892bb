@@ -5,6 +5,8 @@ from .models import (
     BatchCreate,
     CorrectionCreate,
     IngredientCreate,
+    ReplaceAdoptRequest,
+    ReplacePreviewRequest,
     SourcesUpdate,
 )
 
@@ -91,3 +93,26 @@ def finalize_batch(batch_id: str):
     """定版：原子保存声明集合、来源版本和路径，之后来源与声明不可改。"""
     with db.tx() as conn:
         return services.finalize_batch(conn, batch_id)
+
+
+# ------------------------------------------------ 替换预演 / 采纳
+
+@app.post("/batches/{batch_id}/replace/preview")
+def preview_replacement(batch_id: str, payload: ReplacePreviewRequest):
+    """替换预演（不改批次）：找替换位置数最少的可行方案。
+
+    原配方已合格时返回零替换；无可行组合返回 feasible=false。
+    非法序号、空候选、未知候选来源、候选引入循环均返回 422；已定版批次返回 409。
+    """
+    with db.tx() as conn:
+        return services.preview_replacement(conn, batch_id, payload)
+
+
+@app.post("/batches/{batch_id}/replace/adopt")
+def adopt_replacement(batch_id: str, payload: ReplaceAdoptRequest):
+    """携预演依据采纳：同事务确认批次状态、来源关系与原料版本未变化后整体替换。
+
+    依据过期（含依据未知）分别返回 404/409，拒绝时批次不变；依据一次性有效。
+    """
+    with db.tx() as conn:
+        return services.adopt_replacement(conn, batch_id, payload)

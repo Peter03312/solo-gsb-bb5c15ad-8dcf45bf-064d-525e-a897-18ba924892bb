@@ -50,7 +50,50 @@ curl -s -X POST "$BASE/batches" -H 'Content-Type: application/json' \
   -d '{"id":"B-GIFT","product":"礼盒","sources":[{"type":"batch","id":"B-TOP"}]}' | pretty
 curl -s "$BASE/batches/B-GIFT/declaration" | pretty
 
-echo "== 9. 错误示例：空来源 / 未知来源 / 循环引用（均 422）=="
+echo "== 9. 替换预演：禁 peanut，求替换位置数最少的方案（预演不改批次）=="
+curl -s -X POST "$BASE/ingredients" -H 'Content-Type: application/json' \
+  -d '{"id":"ING-RICE","name":"米粉","allergens":[]}' | pretty
+curl -s -X POST "$BASE/batches" -H 'Content-Type: application/json' \
+  -d '{"id":"B-REP","product":"替换演示饼干","sources":[
+        {"type":"ingredient","id":"ING-MILK"},
+        {"type":"ingredient","id":"ING-PEANUT"}]}' | pretty
+PREVIEW=$(curl -s -X POST "$BASE/batches/B-REP/replace/preview" \
+  -H 'Content-Type: application/json' \
+  -d '{"forbidden_allergens":["peanut"],"replacements":[
+        {"seq":0,"candidates":[{"type":"ingredient","id":"ING-RICE"}]},
+        {"seq":1,"candidates":[{"type":"ingredient","id":"ING-RICE"}]}]}')
+echo "$PREVIEW" | pretty
+TOKEN=$(echo "$PREVIEW" | python3 -c "import json,sys; print(json.load(sys.stdin)['basis']['preview_token'])")
+
+echo "== 10. 预演后批次未变化；原料更正使依据过期，采纳被拒绝（409，批次不变）=="
+curl -s "$BASE/batches/B-REP" | pretty
+curl -s -X POST "$BASE/ingredients/ING-MILK/corrections" \
+  -H 'Content-Type: application/json' \
+  -d '{"allergens":["milk","lactose"],"expected_version":1}' >/dev/null
+curl -s -X POST "$BASE/batches/B-REP/replace/adopt" \
+  -H 'Content-Type: application/json' \
+  -d "{\"preview_token\":\"$TOKEN\"}" | pretty || true
+
+echo "== 11. 重新预演并采纳：同事务确认证据未变，成功后整体替换直接来源 =="
+TOKEN=$(curl -s -X POST "$BASE/batches/B-REP/replace/preview" \
+  -H 'Content-Type: application/json' \
+  -d '{"forbidden_allergens":["peanut"],"replacements":[
+        {"seq":1,"candidates":[{"type":"ingredient","id":"ING-RICE"}]}]}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['basis']['preview_token'])")
+curl -s -X POST "$BASE/batches/B-REP/replace/adopt" \
+  -H 'Content-Type: application/json' \
+  -d "{\"preview_token\":\"$TOKEN\"}" | pretty
+curl -s "$BASE/batches/B-REP/declaration" | pretty
+
+echo "== 12. 替换预演错误示例：非法序号 / 空候选 / 未知来源 / 引入循环（均 422）=="
+curl -s -X POST "$BASE/batches/B-REP/replace/preview" -H 'Content-Type: application/json' \
+  -d '{"forbidden_allergens":["x"],"replacements":[{"seq":9,"candidates":[{"type":"ingredient","id":"ING-RICE"}]}]}' | pretty
+curl -s -X POST "$BASE/batches/B-REP/replace/preview" -H 'Content-Type: application/json' \
+  -d '{"forbidden_allergens":["x"],"replacements":[{"seq":0,"candidates":[]}]}' | pretty
+curl -s -X POST "$BASE/batches/B-REP/replace/preview" -H 'Content-Type: application/json' \
+  -d '{"forbidden_allergens":["x"],"replacements":[{"seq":0,"candidates":[{"type":"ingredient","id":"GHOST"}]}]}' | pretty
+
+echo "== 13. 错误示例：空来源 / 未知来源 / 循环引用（均 422）=="
 curl -s -X POST "$BASE/batches" -H 'Content-Type: application/json' \
   -d '{"id":"B-EMPTY","product":"x","sources":[]}' | pretty
 curl -s -X POST "$BASE/batches" -H 'Content-Type: application/json' \
@@ -58,5 +101,5 @@ curl -s -X POST "$BASE/batches" -H 'Content-Type: application/json' \
 curl -s -X PUT "$BASE/batches/B-BASE/sources" -H 'Content-Type: application/json' \
   -d '{"sources":[{"type":"batch","id":"B-GIFT"}]}' | pretty
 
-echo "== 10. 原料修订历史（旧版本保留）=="
+echo "== 14. 原料修订历史（旧版本保留）=="
 curl -s "$BASE/ingredients/ING-PEANUT/versions" | pretty
