@@ -1,0 +1,14 @@
+services:
+  allergen-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DB_PATH: /data/app.db
+      PORT: 8000
+    volumes:
+      - allergen-data:/data
+    restart: unless-stopped
+
+volumes:
+  allergen-data:
